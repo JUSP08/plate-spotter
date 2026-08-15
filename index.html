@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#161D27">
+<title>Plate Spotter — License Plate Game</title>
+<meta name="description" content="Tap a state every time you spot its license plate on the road. Your progress saves on your device.">
+
+<!-- Makes it installable to a phone home screen from Safari/Chrome -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Plate Spotter">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg-top: #1B2430;
+    --bg-bot: #10161F;
+    --tile: #2B3542;
+    --tile-text: #7C8898;
+    --line: #4A5364;
+    --muted: #9BA5B4;
+    --ink: #EDEFF2;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-bot);
+  }
+
+  body {
+    min-height: 100vh;
+    background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bot) 100%);
+    background-attachment: fixed;
+    font-family: 'Oswald', 'Arial Narrow', system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    padding: max(20px, env(safe-area-inset-top)) 16px
+             max(32px, env(safe-area-inset-bottom));
+    -webkit-text-size-adjust: 100%;
+  }
+
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(28px, 6vw, 42px);
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+
+  .sub {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .4px;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:hover { border-color: #6C7688; color: var(--ink); }
+  .btn:focus-visible { outline: 2px solid #F6D53E; outline-offset: 2px; }
+  .btn.armed { background: #E8543E; border-color: #E8543E; color: #fff; }
+
+  .meter-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 14px;
+    margin: 22px 0 6px;
+    color: #C7CDD6;
+  }
+  .meter-row strong { font-weight: 600; }
+
+  .track {
+    height: 10px;
+    border-radius: 999px;
+    background: #2A3340;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px #384252;
+  }
+  .fill {
+    height: 100%;
+    width: 0%;
+    background: repeating-linear-gradient(90deg, #F6D53E 0 18px, #E8543E 18px 36px);
+    transition: width .3s ease;
+  }
+
+  .status {
+    margin: 12px 0 16px;
+    font-size: 12px;
+    min-height: 16px;
+    color: #6E7A8A;
+    font-weight: 400;
+  }
+  .status.warn { color: #D8A94E; }
+
+  /* The map: a tile grid laid out roughly like the real country. */
+  #map {
+    display: grid;
+    gap: clamp(3px, .8vw, 7px);
+    aspect-ratio: 13 / 8;
+  }
+
+  .state {
+    border: 1px solid rgba(0,0,0,.25);
+    border-radius: 6px;
+    background: var(--tile);
+    color: var(--tile-text);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: clamp(9px, 1.6vw, 15px);
+    letter-spacing: .3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    min-width: 0;
+    min-height: 0;
+    transition: background .15s ease, transform .08s ease, color .15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .state:active { transform: scale(.93); }
+  .state:focus-visible { outline: 2px solid #F6D53E; outline-offset: 2px; }
+  .state.inset { border: 1px dashed var(--line); margin-top: 6px; }
+  .state.on {
+    color: #111417;
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,.35);
+  }
+
+  footer {
+    margin-top: 18px;
+    font-size: 12px;
+    color: #5E6878;
+    text-align: center;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Plate Spotter</h1>
+      <p class="sub">Tap a state every time you spot its plate on the road.</p>
+    </div>
+  </header>
+
+  <div class="meter-row">
+    <strong id="count">0 / 51 spotted</strong>
+    <span id="pct">0%</span>
+  </div>
+  <div class="track"><div class="fill" id="fill"></div></div>
+
+  <p class="status" id="status">&nbsp;</p>
+
+  <div id="map" role="group" aria-label="United States license plate map"></div>
+
+  <footer>
+    Alaska and Hawaii sit in their own corner, just like on a real map.<br>
+    Your progress saves in this browser on this device.
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // row/col place each state roughly where it belongs on the map.
+  // AK and HI get their own corner cluster, like a real inset.
+  var STATES = [
+    ["WA","Washington",2,1],["OR","Oregon",3,1],["CA","California",4,1],
+    ["NV","Nevada",3,2],["ID","Idaho",2,3],["UT","Utah",4,3],["AZ","Arizona",5,3],
+    ["MT","Montana",2,4],["WY","Wyoming",3,4],["CO","Colorado",4,4],["NM","New Mexico",5,4],
+    ["ND","North Dakota",2,6],["SD","South Dakota",3,6],["NE","Nebraska",4,6],
+    ["KS","Kansas",5,6],["OK","Oklahoma",6,6],["TX","Texas",7,6],
+    ["MN","Minnesota",2,7],["IA","Iowa",3,7],["MO","Missouri",4,7],
+    ["AR","Arkansas",5,7],["LA","Louisiana",6,7],
+    ["WI","Wisconsin",2,8],["IL","Illinois",3,8],["TN","Tennessee",5,8],["MS","Mississippi",6,8],
+    ["MI","Michigan",2,9],["IN","Indiana",3,9],["KY","Kentucky",4,9],["AL","Alabama",6,9],
+    ["NY","New York",2,10],["OH","Ohio",3,10],["WV","West Virginia",4,10],
+    ["NC","North Carolina",5,10],["GA","Georgia",6,10],
+    ["VT","Vermont",1,11],["MA","Massachusetts",2,11],["PA","Pennsylvania",3,11],
+    ["VA","Virginia",4,11],["SC","South Carolina",5,11],
+    ["NH","New Hampshire",1,12],["NJ","New Jersey",3,12],["MD","Maryland",4,12],
+    ["DC","Washington DC",5,12],
+    ["ME","Maine",1,13],["RI","Rhode Island",2,13],["CT","Connecticut",3,13],
+    ["DE","Delaware",4,13],["FL","Florida",7,13],
+    ["AK","Alaska",7,1],["HI","Hawaii",8,1]
+  ];
+
+  var PALETTE = ["#E8543E","#F2A93B","#F6D53E","#8DBF3F","#3FA66B","#2FA3A8",
+                 "#3E7FCB","#6A5FCB","#B15FCB","#D8477A","#3F9DE8","#E87F3E"];
+
+  var KEY = "plate-spotter.v1";
+  var TOTAL = STATES.length;
+
+  var mapEl = document.getElementById("map");
+  var countEl = document.getElementById("count");
+  var pctEl = document.getElementById("pct");
+  var fillEl = document.getElementById("fill");
+  var statusEl = document.getElementById("status");
+  var spotted = {};
+  var loading = true;
+
+  function cleanState(parsed) {
+    var clean = {};
+    for (var i = 0; i < STATES.length; i++) {
+      if (parsed && parsed[STATES[i][0]]) clean[STATES[i][0]] = parsed[STATES[i][0]];
+    }
+    return clean;
+  }
+
+  function setStatus(message, warn) {
+    statusEl.textContent = message;
+    statusEl.className = warn ? "status warn" : "status";
+  }
+
+  async function loadShared() {
+    try {
+      var response = await fetch("/api/state", { cache: "no-store" });
+      if (!response.ok) throw new Error("state load failed");
+      spotted = cleanState(await response.json());
+      renderAll();
+      setStatus("Saved for everyone.", false);
+    } catch (e) {
+      setStatus("Could not load the shared trip. Retrying...", true);
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function saveShared() {
+    try {
+      var response = await fetch("/api/state", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(spotted)
+      });
+      if (!response.ok) throw new Error("state save failed");
+      setStatus("Saved for everyone.", false);
+    } catch (e) {
+      setStatus("Could not save the shared trip. Check your connection.", true);
+    }
+  }
+
+  function legacyStatus(ok) {
+    if (ok) {
+      statusEl.textContent = "Saved on this device.";
+      statusEl.className = "status";
+    } else {
+      statusEl.textContent =
+        "Not saving — this browser is blocking storage. Turn off Private Browsing to keep your trip.";
+      statusEl.className = "status warn";
+    }
+  }
+
+  // --- Build the map once ---
+  var maxRow = 0, maxCol = 0;
+  STATES.forEach(function (s) {
+    if (s[2] > maxRow) maxRow = s[2];
+    if (s[3] > maxCol) maxCol = s[3];
+  });
+  mapEl.style.gridTemplateColumns = "repeat(" + maxCol + ", 1fr)";
+  mapEl.style.gridTemplateRows = "repeat(" + maxRow + ", 1fr)";
+  mapEl.style.aspectRatio = maxCol + " / " + maxRow;
+
+  var buttons = {};
+
+  STATES.forEach(function (s, i) {
+    var abbr = s[0], name = s[1], row = s[2], col = s[3];
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "state" + (abbr === "AK" || abbr === "HI" ? " inset" : "");
+    b.style.gridRow = row;
+    b.style.gridColumn = col;
+    b.textContent = abbr;
+    b.title = name;
+    b.dataset.abbr = abbr;
+    b.dataset.name = name;
+    b.dataset.color = PALETTE[i % PALETTE.length];
+    b.addEventListener("click", function () { toggle(abbr); });
+    mapEl.appendChild(b);
+    buttons[abbr] = b;
+  });
+
+  function paint(abbr) {
+    var b = buttons[abbr];
+    var on = !!spotted[abbr];
+    b.classList.toggle("on", on);
+    b.style.background = on ? b.dataset.color : "";
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    b.setAttribute("aria-label", b.dataset.name + (on ? ", spotted" : ", not spotted"));
+  }
+
+  function renderMeter() {
+    var n = Object.keys(spotted).length;
+    var pct = Math.round((n / TOTAL) * 100);
+    countEl.textContent = n + " / " + TOTAL + " spotted";
+    pctEl.textContent = pct + "%";
+    fillEl.style.width = pct + "%";
+  }
+
+  function renderAll() {
+    STATES.forEach(function (s) { paint(s[0]); });
+    renderMeter();
+  }
+
+  function toggle(abbr) {
+    if (loading) return;
+    if (spotted[abbr]) delete spotted[abbr];
+    else spotted[abbr] = Date.now();
+    paint(abbr);
+    renderMeter();
+    saveShared();
+  }
+
+  // --- Start ---
+  renderAll();
+  setStatus("Loading shared trip...", false);
+  loadShared();
+  setInterval(loadShared, 4000);
+})();
+</script>
+</body>
+</html>

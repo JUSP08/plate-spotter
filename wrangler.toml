@@ -1,0 +1,12 @@
+name = "plate-spotter"
+main = "_worker.js"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "."
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "plate-spotter-shared"
+database_id = "67046709-6994-48de-8a6d-938492bc20f7"
